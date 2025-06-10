@@ -5,7 +5,7 @@
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/ItalianRagazzo/cv-arm.git
-    cd cv-arm
+   cd cv-arm
     ```
 2. **Install dependencies**:
     ```bash
@@ -15,4 +15,3 @@
     ```bash
     python main.py
     ```
-4. **Ensure you have the DOFBOT arm connected**:
