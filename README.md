@@ -29,4 +29,5 @@
     python pose_fps_test.py                 # webcam 0 10-second test
     python pose_fps_test.py --source 1      # webcam 1
     python pose_fps_test.py --source video.mp4 --duration 5
+    python pose_fps_test.py --display       # display the video with pose estimation
     ```
