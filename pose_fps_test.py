@@ -5,6 +5,7 @@ Usage:
     python pose_fps_test.py                 # webcam 0, 10-second test
     python pose_fps_test.py --source 1      # webcam 1
     python pose_fps_test.py --source video.mp4 --duration 5
+    python pose_fps_test.py --display       # show pose detection
 """
 
 import cv2
@@ -18,6 +19,8 @@ def main():
                         help="0/1/… for webcam index or path to video file")
     parser.add_argument("--duration", type=int, default=10,
                         help="seconds to run the test (default: 10)")
+    parser.add_argument("--display", action="store_true",
+                        help="display video with pose landmarks")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(int(args.source) if str(args.source).isdigit()
@@ -26,6 +29,7 @@ def main():
         raise RuntimeError(f"Unable to open video source {args.source}")
 
     mp_pose = mp.solutions.pose
+    mp_drawing = mp.solutions.drawing_utils
     pose = mp_pose.Pose(static_image_mode=False,
                         model_complexity=1,
                         enable_segmentation=False,
@@ -46,8 +50,18 @@ def main():
 
             # Convert BGR→RGB because MediaPipe expects RGB input
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            _ = pose.process(rgb)            # run inference
+            results = pose.process(rgb)            # run inference
             frame_count += 1
+
+            if args.display:
+                # Draw pose landmarks on the frame
+                if results.pose_landmarks:
+                    mp_drawing.draw_landmarks(
+                        frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                
+                cv2.imshow('Pose Detection', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
             # Print live FPS every second
             if frame_count % 30 == 0:        # adjust for smoother update if needed
@@ -63,6 +77,8 @@ def main():
 
     cap.release()
     pose.close()
+    if args.display:
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
