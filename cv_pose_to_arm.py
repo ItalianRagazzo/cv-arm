@@ -93,6 +93,18 @@ MAX_DEG_PER_FRAME = MAX_DEG_PER_SEC / args.fps
 # Track previous frame's angles for rate limiting
 last_sent_angles = [90] * 6
 
+# -------- Initial Robot Reset (move to neutral pose) --------
+INIT_DURATION_MS = 1000  # 1 second
+NEUTRAL_ANGLES = [90, 90, 90, 90, 90, 90]
+
+if ser:  # Only send if serial is active
+    print("Sending robot to neutral pose...")
+    try:
+        ser.write(PACK.pack(INIT_DURATION_MS, *NEUTRAL_ANGLES))
+        time.sleep(INIT_DURATION_MS / 1000)  # Wait for motion to complete
+    except Exception as e:
+        print(f"⚠️ Failed to send init pose: {e}")
+
 # -------- Main loop ---------------------------------------------------------
 prev_t = time.time()                              # Store time of last robot command
 while cv2.waitKey(1) != 27:                      # Continue until Esc key pressed
