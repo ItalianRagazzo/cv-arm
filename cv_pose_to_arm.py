@@ -11,6 +11,7 @@ import serial, cv2, numpy as np                   # Serial comm, OpenCV, NumPy a
 from mediapipe.tasks import python as mp          # MediaPipe tasks framework
 from mediapipe.tasks.python import vision as mp_vision  # MediaPipe vision tasks
 import mediapipe as mediapipe                      # Main MediaPipe module
+from mediapipe import solutions                    # MediaPipe drawing utilities
 
 # -------- CLI ---------------------------------------------------------------
 parser = argparse.ArgumentParser()                # Create argument parser
@@ -19,6 +20,7 @@ parser.add_argument("--baud",  type=int, default=2_000_000)             # Baud r
 parser.add_argument("--fps",   type=int, default=60)                    # Target FPS for robot updates
 parser.add_argument("--variant", choices=("lite", "full", "heavy"),     # Model complexity choice
                     default="lite", help="Model size to fetch (default: lite)")
+parser.add_argument("--display", action="store_true", help="Overlay pose landmarks on video")  # Display pose option
 args = parser.parse_args()                        # Parse command line arguments
 
 # -------- Serial ------------------------------------------------------------
@@ -42,6 +44,37 @@ def angle_between(v1, v2):                        # Calculate angle between two 
     v2 = v2 / (np.linalg.norm(v2) + 1e-6)        # Normalize second vector (avoid division by zero)
     return math.degrees(math.acos(np.clip(v1 @ v2, -1.0, 1.0)))  # Dot product → angle in degrees
 
+def draw_pose_landmarks(image, landmarks):
+    """Draw pose landmarks and connections on the image"""
+    h, w = image.shape[:2]
+    
+    # Draw landmarks as circles
+    for lm in landmarks:
+        x, y = int(lm.x * w), int(lm.y * h)
+        cv2.circle(image, (x, y), 3, (0, 255, 0), -1)
+    
+    # Define key connections to draw
+    connections = [
+        (11, 12), (12, 14), (14, 16),  # Left arm
+        (11, 13), (13, 15), (15, 17),  # Right arm  
+        (11, 23), (12, 24),           # Torso
+        (23, 24), (23, 25), (24, 26), # Hips and legs
+        (25, 27), (26, 28)            # Lower legs
+    ]
+    
+    # Draw connections as lines
+    for start_idx, end_idx in connections:
+        if start_idx < len(landmarks) and end_idx < len(landmarks):
+            start = landmarks[start_idx]
+            end = landmarks[end_idx]
+            start_point = (int(start.x * w), int(start.y * h))
+            end_point = (int(end.x * w), int(end.y * h))
+            cv2.line(image, start_point, end_point, (255, 255, 255), 2)
+
+# Initialize pose drawing utilities if display is enabled
+if args.display:
+    print("Pose display mode enabled.")
+
 # -------- Main loop ---------------------------------------------------------
 prev_t = time.time()                              # Store time of last robot command
 while cv2.waitKey(1) != 27:                      # Continue until Esc key pressed
@@ -56,6 +89,9 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
         cv2.imshow("pose", frame)                 # Show original frame
         continue                                  # Skip to next frame
 
+    # Draw pose landmarks if display option is enabled
+    if args.display and result.pose_landmarks:
+        draw_pose_landmarks(frame, result.pose_landmarks[0])
 
     lm = result.pose_landmarks[0]                 # Get first person's landmarks
     # Extract 3D coordinates of key body points (x, y, z normalized 0-1)
