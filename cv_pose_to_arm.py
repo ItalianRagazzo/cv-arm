@@ -15,7 +15,7 @@ from mediapipe import solutions                    # MediaPipe drawing utilities
 
 # -------- CLI ---------------------------------------------------------------
 parser = argparse.ArgumentParser()                # Create argument parser
-parser.add_argument("--com",   required=True, help="e.g. COM3")         # Serial port (required)
+parser.add_argument("--com", help="e.g. COM3 (leave empty to disable serial output)")
 parser.add_argument("--baud",  type=int, default=2_000_000)             # Baud rate (default 2M)
 parser.add_argument("--fps",   type=int, default=60)                    # Target FPS for robot updates
 parser.add_argument("--variant", choices=("lite", "full", "heavy"),     # Model complexity choice
@@ -24,7 +24,14 @@ parser.add_argument("--display", action="store_true", help="Overlay pose landmar
 args = parser.parse_args()                        # Parse command line arguments
 
 # -------- Serial ------------------------------------------------------------
-ser   = serial.Serial(args.com, args.baud, timeout=0)  # Open serial connection to robot
+ser = None # Open serial connection to robot
+if args.com:
+    try:
+        ser = serial.Serial(args.com, args.baud, timeout=0)
+    except serial.SerialException as e:
+        print(f"⚠️ Serial connection failed: {e}")
+        ser = None
+ 
 PACK  = struct.Struct(">H6B")                     # Binary format: big-endian, 1 short + 6 bytes
 DURMS = int(10000 / args.fps)                     # Duration in milliseconds between robot commands
 
@@ -75,6 +82,17 @@ def draw_pose_landmarks(image, landmarks):
 if args.display:
     print("Pose display mode enabled.")
 
+# Initialize filtered joint angle buffer
+filtered_angles = [90] * 6  # Start at 90° neutral
+SMOOTHING_ALPHA = 0.3       # Smoothing factor (adjust 0.1–0.5 to taste)
+
+# For rate limiting
+MAX_DEG_PER_SEC = 45
+MAX_DEG_PER_FRAME = MAX_DEG_PER_SEC / args.fps
+
+# Track previous frame's angles for rate limiting
+last_sent_angles = [90] * 6
+
 # -------- Main loop ---------------------------------------------------------
 prev_t = time.time()                              # Store time of last robot command
 while cv2.waitKey(1) != 27:                      # Continue until Esc key pressed
@@ -95,42 +113,106 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
 
     lm = result.pose_landmarks[0]                 # Get first person's landmarks
     # Extract 3D coordinates of key body points (x, y, z normalized 0-1)
-    sh = np.array([lm[12].x, lm[12].y, lm[12].z])    # RIGHT_SHOULDER = index 12
-    el = np.array([lm[14].x, lm[14].y, lm[14].z])    # RIGHT_ELBOW = index 14
-    wr = np.array([lm[16].x, lm[16].y, lm[16].z])    # RIGHT_WRIST = index 16
-    hip = np.array([lm[24].x, lm[24].y, lm[24].z])   # RIGHT_HIP = index 24
+    # Get 3D joint positions
+    sh = np.array([lm[12].x, lm[12].y, lm[12].z])  # Shoulder
+    el = np.array([lm[14].x, lm[14].y, lm[14].z])  # Elbow
+    wr = np.array([lm[16].x, lm[16].y, lm[16].z])  # Wrist
 
-    # Calculate 3D vectors between body points
-    upper, torso, fore = el - sh, hip - sh, wr - el  # Upper arm, torso, forearm vectors
+    # Vectors
+    sw = wr - sh  # Shoulder to wrist
+    se = el - sh  # Shoulder to elbow
+    ew = wr - el  # Elbow to wrist
 
-    # Convert body pose to robot joint angles
-    j2 = angle_between(upper, torso)                 # Shoulder pitch: upper arm vs torso
-    j3 = 180 - angle_between(upper, fore)            # Elbow flex: supplement of upper arm vs forearm
-    j1 = (math.degrees(math.atan2(-upper[0], -upper[2])) + 360) % 360  # Shoulder yaw: upper arm rotation
-    roll = angle_between(np.cross(upper, fore), np.array([0, 0, -1]))  # Wrist roll: hand orientation
-    
-    # Pack angles into robot command format with range limits
+    # Compute angles in degrees
+    # 1. Horizontal angle of shoulder→wrist (XZ plane)
+    j0 = math.degrees(math.atan2(-sw[0], -sw[2]))  # side-to-side
+    j0 = 90 + j0  # 0 when pointing Z+, make it 90
+
+    # 2. Vertical angle of shoulder→wrist (YZ plane)
+    j1 = math.degrees(math.atan2(sw[1], -sw[2]))
+    j1 = 90 - j1  # 0 when Z+, make it 90
+
+    # Angle between shoulder→elbow vector and global Y-axis (vertical)
+    up = np.array([0, 1, 0])  # unit Y
+    se_norm = se / (np.linalg.norm(se) + 1e-6)
+    j2 = angle_between(se_norm, up)  # 0° when pointing up, 90° when horizontal
+    #j2 = 90 - j2
+
+    # 4. Vertical angle of elbow→wrist
+    ew_norm = ew / (np.linalg.norm(ew) + 1e-6)
+    j3 = angle_between(ew_norm, up)
+    #j3 = 90 - j3
+
+    # Clamp and package
     angles = [
-        int(np.clip(j1, 0, 180)),                    # joint-1: base rotation (0-180°)
-        int(np.clip(j2, 0, 180)),                    # joint-2: shoulder pitch (0-180°)
-        int(np.clip(j3, 0, 180)),                    # joint-3: elbow flex (0-180°)
-        int(np.clip(j3, 0, 180)),                    # joint-4: duplicate elbow (robot specific)
-        int(np.clip(roll, 0, 270)),                  # joint-5: wrist roll (0-270°)
-        90                                           # joint-6: gripper fixed at 90°
+        int(np.clip(j0, 0, 180)),
+        int(np.clip(j1, 0, 180)),
+        int(np.clip(j2, 0, 180)),
+        int(np.clip(j3, 0, 180)),
+        90,
+        90
     ]
 
+    # Determine effective visibility
+    v = [lm[i].visibility for i in range(33)]  # All visibilities
+    confidences = [
+        min(v[12], v[16]),  # joint 0: shoulder-wrist horiz
+        min(v[12], v[16]),  # joint 1: shoulder-wrist vertical
+        min(v[12], v[14]),  # joint 2: shoulder-elbow vertical
+        min(v[14], v[16]),  # joint 3: elbow-wrist vertical
+        1.0,                # joint 4: fixed
+        1.0                 # joint 5: fixed
+    ]
+
+    # Smooth joint angles using exponential moving average
+    for i in range(6):
+        alpha = max(0.1, SMOOTHING_ALPHA * confidences[i])
+        filtered_angles[i] = alpha * angles[i] + (1 - alpha) * filtered_angles[i]
+        if confidences[i] < 0.3:
+            filtered_angles[i] = filtered_angles[i] # don't change
+        elif confidences[i] >= 0.3:
+            alpha = max(0.1, SMOOTHING_ALPHA * confidences[i])
+            filtered_angles[i] = alpha * angles[i] + (1 - alpha) * filtered_angles[i]
+    
+
+    # Round for robot compatibility (convert to ints)
+    #send_angles = [int(round(a)) for a in filtered_angles]
+
+    # Rate limit each joint
+    limited_angles = []
+    for i in range(6):
+        diff = filtered_angles[i] - last_sent_angles[i]
+        # Clamp to ±MAX_DEG_PER_FRAME
+        if diff > MAX_DEG_PER_FRAME:
+            diff = MAX_DEG_PER_FRAME
+        elif diff < -MAX_DEG_PER_FRAME:
+            diff = -MAX_DEG_PER_FRAME
+        # Apply clamped delta
+        limited_angle = last_sent_angles[i] + diff
+        limited_angles.append(int(round(limited_angle)))
+
+    # Update for next frame
+    last_sent_angles = limited_angles.copy()
+
+    # Use for sending and displaying
+    send_angles = limited_angles
+
     # Send robot commands at specified FPS rate
-    now = time.time()                                # Get current time
-    if now - prev_t >= 1/args.fps:                  # If enough time passed since last command
-        ser.write(PACK.pack(DURMS, *angles))         # Send binary packet: duration + 6 angles
-        prev_t = now                                 # Update last command time
+    if ser:
+        now = time.time()                                # Get current time
+        if now - prev_t >= 1/args.fps:                  # If enough time passed since last command
+            ser.write(PACK.pack(DURMS, *send_angles))         # Send binary packet: duration + 6 angles
+            prev_t = now                                 # Update last command time
 
     # Display angle values on video feed
-    cv2.putText(frame, f"{angles}", (10, 30),        # Draw text at position (10, 30)
+    cv2.putText(frame, f"{send_angles}", (10, 30),        # Draw text at position (10, 30)
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)  # Green text, size 0.6, thickness 2
+    cv2.putText(frame, f"Conf: {[round(c, 2) for c in confidences]}", (10, 50),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
     cv2.imshow("pose", frame)                        # Show frame with overlay
 
 # Cleanup when exiting
 cap.release()                                        # Release webcam
-ser.close()                                          # Close serial connection
+if ser:
+    ser.close()                                          # Close serial connection
 cv2.destroyAllWindows()                              # Close all OpenCV windows
