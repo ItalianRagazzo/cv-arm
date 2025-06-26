@@ -20,11 +20,7 @@
 4. **Install torch and torchvision**:
     https://pytorch.org/get-started/locally/
       
-5. **Run the main script**:
-    ```bash
-    python main.py
-    ```
-6. Or **Run pose_fps_test.py** to test the FPS of the pose estimation:
+5. **Run pose_fps_test.py** to test the FPS of the pose estimation:
     ```bash
     python pose_fps_test.py                 # webcam 0 10-second test
     python pose_fps_test.py --source 1      # webcam 1
