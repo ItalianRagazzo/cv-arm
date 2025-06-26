@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #coding: utf-8
-import smbus
+import smbus2
 import time
 # V0.0.5
 
@@ -8,7 +8,7 @@ class Arm_Device(object):
 
     def __init__(self):
         self.addr = 0x15
-        self.bus = smbus.SMBus(1)
+        self.bus = smbus2.SMBus(1)
 
     # set bus servo：id: 1-6(0 means control all servo) angle: 0-180 
     def Arm_serial_servo_write(self, id, angle, time):
