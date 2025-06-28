@@ -84,10 +84,10 @@ if args.display:
 
 # Initialize filtered joint angle buffer
 filtered_angles = [90] * 6  # Start at 90° neutral
-SMOOTHING_ALPHA = 0.3       # Smoothing factor (adjust 0.1–0.5 to taste)
+SMOOTHING_ALPHA = 0.5       # Smoothing factor (adjust 0.1–0.5 to taste)
 
 # For rate limiting
-MAX_DEG_PER_SEC = 45
+MAX_DEG_PER_SEC = 135
 MAX_DEG_PER_FRAME = MAX_DEG_PER_SEC / args.fps
 
 # Track previous frame's angles for rate limiting
