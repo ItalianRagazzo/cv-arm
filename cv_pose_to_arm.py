@@ -41,6 +41,12 @@ print(f"Loading {model_file} (auto-download if missing)…")  # User feedback
 landmarker = mp_vision.PoseLandmarker.create_from_model_path(model_file)  # Load pose detection model
 print("Pose model ready.")                        # Confirm model loaded
 
+# -------- MediaPipe Hand Tracking Initialization ----------------------------
+hand_model_file = "hand_landmarker.task"
+print(f"Loading {hand_model_file} (auto-download if missing)…")
+hand_landmarker = mp_vision.HandLandmarker.create_from_model_path(hand_model_file)
+print("Hand model ready.")
+
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)          # Open webcam (index 0) with DirectShow backend
 if not cap.isOpened():                            # Check if camera opened successfully
     sys.exit("❌ Webcam not found.")              # Exit with error if no camera
@@ -148,13 +154,20 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert BGR (OpenCV) to RGB (MediaPipe)
     mp_img = mediapipe.Image(image_format=mediapipe.ImageFormat.SRGB, data=rgb)  # Create MediaPipe image
     result = landmarker.detect(mp_img)            # Run pose detection on image
-    if not result.pose_landmarks:                 # If no pose detected
+    hand_result = hand_landmarker.detect(mp_img)  # Run hand detection on image
+    if not result.pose_landmarks:
         cv2.imshow("pose", frame)   # display
         continue                                  # Skip to next frame
 
     # Draw pose landmarks if display option is enabled
     if args.display and result.pose_landmarks:
         draw_pose_landmarks(frame, result.pose_landmarks[0])
+    # Draw hand landmarks if display option is enabled
+    if args.display and hand_result.hand_landmarks:
+        for hand_landmarks in hand_result.hand_landmarks:
+            for lm in hand_landmarks:
+                x, y = int(lm.x * frame.shape[1]), int(lm.y * frame.shape[0])
+                cv2.circle(frame, (x, y), 2, (255, 0, 255), -1)
 
     # Extract landmarks and visibility
     lm = result.pose_landmarks[0]                 # Get first person's landmarks
@@ -276,33 +289,86 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
     # Elbow angle calculation
     elbow_angle = angle_between(-se, ew)  # Angle between shoulder-elbow and elbow
 
-    # Clamp and package
+
+    # --- Wrist roll from hand model only ---
+    hand_wrist_roll_raw = None
+    if hand_result.hand_landmarks:
+        hand_lm = hand_result.hand_landmarks[0]
+        hw = hand_lm[0]
+        hi = hand_lm[5]
+        hp = hand_lm[17]
+        v1h = np.array([hi.x - hw.x, hi.y - hw.y])
+        v2h = np.array([hp.x - hw.x, hp.y - hw.y])
+        hand_wrist_roll_raw = math.degrees(math.atan2(v2h[1], v2h[0]) - math.atan2(v1h[1], v1h[0]))
+        hand_wrist_conf = 1.0
+    else:
+        hand_wrist_conf = 0.0
+
+    # --- Smoothing for hand wrist roll only ---
+    if not hasattr(globals(), 'filtered_hand_wrist_roll'):
+        filtered_hand_wrist_roll = 0.0
+    hand_alpha = max(0.1, SMOOTHING_ALPHA * hand_wrist_conf)
+    if hand_wrist_roll_raw is not None:
+        filtered_hand_wrist_roll = hand_alpha * hand_wrist_roll_raw + (1 - hand_alpha) * filtered_hand_wrist_roll
+    else:
+        filtered_hand_wrist_roll = filtered_hand_wrist_roll
+    j4 = filtered_hand_wrist_roll
+    j4 = 90 + j4  # Center at 90
+
+    # --- Hand openness estimation (0 = closed, 180 = fully open) ---
+    hand_openness_raw = None
+    if hand_result.hand_landmarks:
+        hand_lm = hand_result.hand_landmarks[0]
+        tips = [4, 8, 12, 16, 20]
+        mcps = [2, 5, 9, 13, 17]
+        openness = 0.0
+        for tip, mcp in zip(tips, mcps):
+            tip_pos = np.array([hand_lm[tip].x, hand_lm[tip].y])
+            mcp_pos = np.array([hand_lm[mcp].x, hand_lm[mcp].y])
+            openness += np.linalg.norm(tip_pos - mcp_pos)
+        openness /= 5.0
+        palm_width = np.linalg.norm(np.array([hand_lm[5].x, hand_lm[5].y]) - np.array([hand_lm[17].x, hand_lm[17].y]))
+        if palm_width > 1e-6:
+            openness_norm = openness / palm_width
+            min_open = 0.5  # closed
+            max_open = 1.5  # open
+            openness_norm = np.clip(openness_norm, min_open, max_open)
+            hand_openness_raw = (openness_norm - min_open) / (max_open - min_open) * 180.0
+            hand_openness_raw = np.clip(hand_openness_raw, 0, 180)
+        else:
+            hand_openness_raw = 0.0
+        hand_openness_conf = 1.0
+    else:
+        hand_openness_conf = 0.0
+
+    # --- Smoothing for hand openness ---
+    if not hasattr(globals(), 'filtered_hand_openness'):
+        filtered_hand_openness = 0.0
+    hand_openness_alpha = max(0.1, SMOOTHING_ALPHA * hand_openness_conf)
+    if hand_openness_raw is not None:
+        filtered_hand_openness = hand_openness_alpha * hand_openness_raw + (1 - hand_openness_alpha) * filtered_hand_openness
+    else:
+        filtered_hand_openness = filtered_hand_openness
+    j5 = filtered_hand_openness
+
+    # Clamp and package, map j4 to wrist roll and j5 to hand openness
     angles = [
         int(np.clip(j0, 0, 180)),
         int(np.clip(j1, 0, 180)),
         int(np.clip(j2, 0, 135)),
         int(np.clip(j3, 0, 135)),
-        90,
-        90
-    ]
-
-    angles = [
-        int((j0)),
-        int((j1)),
-        int((j2)),
-        int((j3)),
-        90,
-        90
+        int(np.clip(j4, 0, 180)),
+        int(np.clip(j5, 0, 180))
     ]
 
     # Determine effective visibility
     confidences = [
-        min(v[12], v[16]),  # joint 0: shoulder-wrist horiz
-        min(v[12], v[16]),  # joint 1: shoulder-wrist vertical
-        min(v[12], v[14]),  # joint 2: shoulder-elbow vertical
-        min(v[14], v[16]),  # joint 3: elbow-wrist vertical
-        1.0,                # joint 4: fixed
-        1.0                 # joint 5: fixed
+        float(min(v[12], v[16])),  # joint 0: shoulder-wrist horiz
+        float(min(v[12], v[16])),  # joint 1: shoulder-wrist vertical
+        float(min(v[12], v[14])),  # joint 2: shoulder-elbow vertical
+        float(min(v[14], v[16])),  # joint 3: elbow-wrist vertical
+        float(hand_wrist_conf),    # joint 4: wrist roll
+        float(hand_openness_conf)  # joint 5: hand openness
     ]
 
     # Smooth joint angles using exponential moving average
@@ -395,6 +461,13 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
     else:
         cv2.putText(frame, "Calibration: INACTIVE", (10, yposition_display_line),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+    # Display both wrist rolls on the frame
+    yposition_display_line = yposition_display_line + 20
+    cv2.putText(frame, f"Hand wrist roll: {filtered_hand_wrist_roll:.1f} (conf: {float(hand_wrist_conf):.2f})", (10, yposition_display_line),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 100, 255), 1)
+    yposition_display_line = yposition_display_line + 20
+    cv2.putText(frame, f"Hand openness: {filtered_hand_openness:.1f} deg (conf: {float(hand_openness_conf):.2f})", (10, yposition_display_line),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 255, 100), 1)
 
 
 
