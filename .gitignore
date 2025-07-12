@@ -176,3 +176,5 @@ Thumbs.db
 # *.json
 # data/
 # datasets/
+checkpoints/video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m.py
+checkpoints/videopose_h36m_243frames_fullconv_supervised_cpn_ft-88f5abbb_20210527.pth

@@ -2,3 +2,5 @@ opencv-python
 mediapipe==0.10.13
 pyserial
 numpy
+openmim
+setuptools

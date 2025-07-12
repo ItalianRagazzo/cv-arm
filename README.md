@@ -19,8 +19,15 @@
     ```
 4. **Install torch and torchvision**:
     https://pytorch.org/get-started/locally/
-      
-5. **Run pose_fps_test.py** to test the FPS of the pose estimation:
+
+
+5. **Install MIM and MMEngine**:
+    ```bash
+    mim install mmengine mmdet mmcv mmpose
+    mim download mmpose --config video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m --dest checkpoints
+    ```
+
+6. **Run pose_fps_test.py** to test the FPS of the pose estimation:
     ```bash
     python pose_fps_test.py                 # webcam 0 10-second test
     python pose_fps_test.py --source 1      # webcam 1
