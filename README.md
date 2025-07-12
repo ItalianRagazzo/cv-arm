@@ -25,6 +25,7 @@
     ```bash
     mim install mmengine mmdet mmcv mmpose
     mim download mmpose --config video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m --dest checkpoints
+    # mim download mmpose --config video-pose-lift_tcn-27frm-supv_8xb128-160e_h36m --dest checkpoints # for a smaller model
     ```
 
 6. **Run pose_fps_test.py** to test the FPS of the pose estimation:
