@@ -4,3 +4,4 @@ pyserial
 numpy
 openmim
 setuptools
+platformdirs
