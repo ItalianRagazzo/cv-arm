@@ -18,7 +18,7 @@ import typer
 
 from cv_arm.utils import angle_between, align_vector_to_z
 from cv_arm.processing import compute_pose_angles, compute_hand_metrics, blend_and_rate_limit, render_overlay
-from cv_arm.config import Config
+from cv_arm.config import load_config, Config
 
 
 @dataclass
@@ -167,7 +167,7 @@ def main(
     )
     reset_robot(ser, pack, [90]*6, init_ms=1000)
     # Centralized configuration
-    config = Config()
+    config = load_config()
     run_loop(cap, landmarker, hand_landmarker, ser, pack, durms, fps, display, state, config)
      
 if __name__ == "__main__":

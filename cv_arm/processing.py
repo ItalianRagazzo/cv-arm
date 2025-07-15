@@ -23,9 +23,10 @@ def compute_pose_angles(lm, config: Config) -> Tuple[List[float], List[float]]:
     # Joint 0: shoulder flexion/extension
     j0 = 90 - math.degrees(math.atan2(-sw[0], sw[2]))
     # Joint 1: shoulder abduction/adduction
-    sw_yz = min(math.degrees(math.atan2(sw[1], -sw[2])), 0)
+    sw_yz = min(math.degrees(math.atan2(sw[1], -sw[2])), 0.0)
     sw_se = angle_between(sw, se)
-    j1 = 0 if sw_yz == 0 else 180 + sw_yz + sw_se
+    # ensure j1 is always a float
+    j1 = 0.0 if sw_yz == 0.0 else 180.0 + sw_yz + sw_se
     # Joint 2: elbow flexion
     R = align_vector_to_z(sw)
     el_rot = R @ (el - sh)
@@ -42,9 +43,9 @@ def compute_pose_angles(lm, config: Config) -> Tuple[List[float], List[float]]:
             angle_xy = -angle_xy
         j3 = 90 - angle_xy - 40
     else:
-        j3 = 90
+        j3 = 90.0
     # Return raw angles and confidences
-    angles = [j0, j1, j2, j3]
+    angles = [float(j0), float(j1), float(j2), float(j3)]
     confidences = [
         float(min(v[12], v[16])),
         float(min(v[12], v[16])),
@@ -121,7 +122,12 @@ def blend_and_rate_limit(
 
 def render_overlay(frame, pose_landmark, hand_landmarks) -> None:
     """Draw pose and hand landmarks on the frame."""
-    draw_pose_landmarks(frame, pose_landmark)
+    # Allow single pose_landmark or iterable of landmarks
+    try:
+        landmarks = list(pose_landmark)
+    except TypeError:
+        landmarks = [pose_landmark]
+    draw_pose_landmarks(frame, landmarks)
     if hand_landmarks:
         for hl in hand_landmarks:
             for lm in hl:

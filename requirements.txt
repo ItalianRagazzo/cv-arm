@@ -6,3 +6,5 @@ openmim
 setuptools
 platformdirs
 typer
+pyyaml
+pytest
