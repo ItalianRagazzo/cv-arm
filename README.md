@@ -7,6 +7,7 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
 - Compute joint angles and send commands to DOFBOT over serial
 - Smoothing, rate limiting, and confidence filtering
 - Configurable model variants (lite, full, heavy)
+- Loadable parameters via `config.yaml` (smoothing, thresholds, ratios)
 - Console script entry point: `cv-pose-to-arm` CLI
 
 ## Setup
@@ -37,13 +38,19 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
    pip install -e .
    ```
 
-5. Install PyTorch and torchvision (choose correct CUDA/cuDNN version):
+5. (Optional) Run unit tests to verify setup:
+
+   ```powershell
+   pytest
+   ```
+
+6. Install PyTorch and torchvision (choose correct CUDA/cuDNN version):
 
    ```none
    # Visit https://pytorch.org/get-started/locally/ for instructions
    ```
 
-6. Install MIM and MMEngine, then download MMpose checkpoints:
+7. Install MIM and MMEngine, then download MMpose checkpoints:
 
    ```powershell
    mim install mmengine mmdet mmcv mmpose
@@ -57,13 +64,15 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
 Run the CLI to stream webcam → pose estimation → DOFBOT:
 
 ```powershell
-cv-pose-to-arm [--com COM_PORT] [--baud BAUD] [--fps FPS] [--variant lite|full|heavy] [--display]
+cv-pose-to-arm [--com COM_PORT] [--baud BAUD] [--fps FPS] \
+  [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
 ```
 
 Alternatively, invoke the package directly:
 
 ```powershell
-python -m cv_arm [--com COM_PORT] [--baud BAUD] [--fps FPS] [--variant lite|full|heavy] [--display]
+python -m cv_arm [--com COM_PORT] \
+  [--baud BAUD] [--fps FPS] [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
 ```
 
 Options:
@@ -72,14 +81,19 @@ Options:
 - `--fps`: command update rate (default: 60)
 - `--variant`: model complexity (`lite`, `full`, `heavy`)
 - `--display`: overlay landmarks and diagnostics on video window
+- `--verbose` / `--quiet`: set logging level to DEBUG or ERROR
 
 Example:
 
 ```powershell
-cv-pose-to-arm --com COM3 --variant full --display
+cv-pose-to-arm --com COM3 --variant full --display --verbose
 ```
 
 Press <Esc> in the window to exit.
+
+## Configuration File
+
+You can override default parameters by editing `cv_arm/config.yaml`. Any keys missing will fall back to the built-in defaults.
 
 ## Performance Testing
 
@@ -87,12 +101,17 @@ To measure pose estimation FPS, run:
 
 ```powershell
 python pose_fps_test.py --source 0 --duration 10
-```
+``` 
 
 More options:
 - `--source`: camera index or video file
 - `--duration`: test duration in seconds
 - `--display`: show annotated video
+
+## Testing & CI
+
+- Run `pytest` locally to execute unit tests in the `tests/` folder.
+- A GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs tests on each push and pull request.
 
 ## License
 
