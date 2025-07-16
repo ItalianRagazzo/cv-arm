@@ -114,7 +114,7 @@ filtered_torso_len = 0.5  # Initial torso length (normalized)
 filtered_upper_len = 0.4  # Initial upper arm length (normalized)
 filtered_fore_len = 0.4   # Initial forearm length (normalized)
 SMOOTHING_ALPHA = 0.3       # Smoothing factor (adjust 0.1–0.5 to taste)
-CONFIDENCE_THRESHOLD = 0.9
+CONFIDENCE_THRESHOLD = 0.5
 
 # For rate limiting
 MAX_DEG_PER_SEC = 360
@@ -241,7 +241,7 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
     if sw_yz == 0:
         j1 = 0
     else:
-        j1 = 180 + sw_yz + sw_se
+        j1 = 180 + sw_yz #+ sw_se
     # To force 90 when straight up, subtract (j1-90) from j1
     j1 = j1  # This will make j1 = 90 when arm is straight up
 
@@ -284,7 +284,7 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
     j3 = blend_weight * j3 + (1 - blend_weight) * 90
 
 
-    j2 = (j1 + j3)/2  # Average of j1 and j3 for elbow angle
+    j2 = ((((j1 + j3)/2 - 90)/2)+90)  # Average of j1 and j3 for elbow angle
 
     # Elbow angle calculation
     elbow_angle = angle_between(-se, ew)  # Angle between shoulder-elbow and elbow
@@ -350,13 +350,14 @@ while cv2.waitKey(1) != 27:                      # Continue until Esc key presse
     else:
         filtered_hand_openness = filtered_hand_openness
     j5 = filtered_hand_openness
+    j5 = 180-(j5*2-25)
 
     # Clamp and package, map j4 to wrist roll and j5 to hand openness
     angles = [
         int(np.clip(j0, 0, 180)),
         int(np.clip(j1, 0, 180)),
-        int(np.clip(j2, 0, 135)),
-        int(np.clip(j3, 0, 135)),
+        int(np.clip(j2, 45, 135)),
+        int(np.clip(j3, 45, 135)),
         int(np.clip(j4, 0, 180)),
         int(np.clip(j5, 0, 180))
     ]
