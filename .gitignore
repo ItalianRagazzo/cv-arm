@@ -176,4 +176,8 @@ Thumbs.db
 # *.json
 # data/
 # datasets/
-checkpoints/
+
+# Ignore all contents under checkpoints except mediapipe folder
+/checkpoints/*
+!/checkpoints/mediapipe/
+!/checkpoints/mediapipe/**
