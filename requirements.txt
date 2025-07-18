@@ -1,7 +1,7 @@
-opencv-python
+numpy==1.24.4
 mediapipe==0.10.13
+opencv-python==4.7.0.72
 pyserial
-numpy
 openmim
 setuptools
 platformdirs
