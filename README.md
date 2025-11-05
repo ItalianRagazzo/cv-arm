@@ -76,10 +76,8 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
 7. Install MIM and MMEngine, then download MMpose checkpoints:
 
    ```powershell
-   mim install mmengine mmdet mmcv mmpose
-   mim download mmpose \
-     --config video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m \
-     --dest checkpoints
+   mim install mmcv==2.1.0 mmdet==3.2.0 mmdet mmpose==1.3.2
+   mim download mmpose --config video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m --dest checkpoints
    ```
 
 ## Usage
