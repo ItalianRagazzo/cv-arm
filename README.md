@@ -12,6 +12,35 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
 
 ## Setup
 
+### Using uv (Recommended)
+
+1. Install uv if you haven't already:
+
+   ```powershell
+   pip install uv
+   ```
+
+2. Clone the repository:
+
+   ```powershell
+   git clone https://github.com/ItalianRagazzo/cv-arm.git
+   cd cv-arm
+   ```
+
+3. Install the project and dependencies:
+
+   ```powershell
+   uv sync
+   ```
+
+4. (Optional) Run unit tests to verify setup:
+
+   ```powershell
+   uv run pytest
+   ```
+
+### Using pip (Alternative)
+
 1. Clone the repository:
 
    ```powershell
@@ -26,19 +55,13 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
    .\venv\Scripts\activate
    ```
 
-3. Install Python dependencies:
-
-   ```powershell
-   pip install -r requirements.txt
-   ```
-
-4. Install the package in editable mode:
+3. Install the package in editable mode:
 
    ```powershell
    pip install -e .
    ```
 
-5. (Optional) Run unit tests to verify setup:
+4. (Optional) Run unit tests to verify setup:
 
    ```powershell
    pytest
@@ -60,6 +83,24 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
    ```
 
 ## Usage
+
+### Using uv
+
+Run the CLI to stream webcam → pose estimation → DOFBOT:
+
+```powershell
+uv run cv-pose-to-arm [--com COM_PORT] [--baud BAUD] [--fps FPS] \
+  [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
+```
+
+Alternatively, invoke the package directly:
+
+```powershell
+uv run python -m cv_arm [--com COM_PORT] \
+  [--baud BAUD] [--fps FPS] [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
+```
+
+### Using pip
 
 Run the CLI to stream webcam → pose estimation → DOFBOT:
 
@@ -83,7 +124,13 @@ Options:
 - `--display`: overlay landmarks and diagnostics on video window
 - `--verbose` / `--quiet`: set logging level to DEBUG or ERROR
 
-Example:
+Example with uv:
+
+```powershell
+uv run cv-pose-to-arm --com COM3 --variant full --display --verbose
+```
+
+Example with pip:
 
 ```powershell
 cv-pose-to-arm --com COM3 --variant full --display --verbose
@@ -100,6 +147,10 @@ You can override default parameters by editing `cv_arm/config.yaml`. Any keys mi
 To measure pose estimation FPS, run:
 
 ```powershell
+# With uv
+uv run python pose_fps_test.py --source 0 --duration 10
+
+# With pip
 python pose_fps_test.py --source 0 --duration 10
 ``` 
 
@@ -110,7 +161,7 @@ More options:
 
 ## Testing & CI
 
-- Run `pytest` locally to execute unit tests in the `tests/` folder.
+- Run `uv run pytest` (or `pytest` with pip) locally to execute unit tests in the `tests/` folder.
 - A GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs tests on each push and pull request.
 
 ## License

@@ -186,6 +186,11 @@ while cv2.waitKey(1) != 27:
     # Display angles
     angle_text = f"Angles: {np.round(filtered_angles).astype(int)}"
     cv2.putText(frame, angle_text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+    angle_text2 = f"Shoulder: {np.array(sh)}"
+    cv2.putText(frame, angle_text2, (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+    angle_text3 = f"Wrist: {np.array(wr)}"
+    cv2.putText(frame, angle_text3, (10,70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+
     cv2.imshow("DOFBOT - VideoPose3D", frame)
     print("Frame displayed.")
 
