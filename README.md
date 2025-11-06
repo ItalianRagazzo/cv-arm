@@ -1,18 +1,17 @@
 # CV and DOFBOT Arm Project
 
-A Python package and CLI for driving a DOFBOT robotic arm using real-time computer vision and MediaPipe pose/hand tracking.
+A Python package and CLI for driving a DOFBOT robotic arm using real-time computer vision and pose tracking.
 
 ## Features
-- Detect human pose & hand landmarks via MediaPipe
+- Real-time human pose & hand landmark detection via MediaPipe
+- Experimental 3D pose estimation with VideoPose3D
 - Compute joint angles and send commands to DOFBOT over serial
 - Smoothing, rate limiting, and confidence filtering
 - Configurable model variants (lite, full, heavy)
-- Loadable parameters via `config.yaml` (smoothing, thresholds, ratios)
+- Loadable parameters via `config.yaml`
 - Console script entry point: `cv-pose-to-arm` CLI
 
 ## Setup
-
-### Using uv (Recommended)
 
 1. Install uv if you haven't already:
 
@@ -39,52 +38,28 @@ A Python package and CLI for driving a DOFBOT robotic arm using real-time comput
    uv run pytest
    ```
 
-### Using pip (Alternative)
+### Advanced Models Setup
 
-1. Clone the repository:
+For transformer-based 3D pose estimation, install PyTorch:
 
-   ```powershell
-   git clone https://github.com/ItalianRagazzo/cv-arm.git
-   cd cv-arm
-   ```
+```powershell
+# Install PyTorch for PoseFormer
+uv sync --extra torch
+```
 
-2. (Optional) Create and activate a virtual environment:
+For experimental VideoPose3D, install MMPose:
 
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-
-3. Install the package in editable mode:
-
-   ```powershell
-   pip install -e .
-   ```
-
-4. (Optional) Run unit tests to verify setup:
-
-   ```powershell
-   pytest
-   ```
-
-6. Install PyTorch and torchvision (choose correct CUDA/cuDNN version):
-
-   ```none
-   # Visit https://pytorch.org/get-started/locally/ for instructions
-   ```
-
-7. Install MIM and MMEngine, then download MMpose checkpoints:
-
-   ```powershell
-   mim install mmcv==2.1.0 mmdet==3.2.0 mmdet mmpose==1.3.2
-   mim download mmpose --config video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m --dest checkpoints
-   ```
+```powershell
+# Install MMPose for VideoPose3D (research/experimental)
+uv run mim install mmcv==2.1.0 mmdet==3.2.0 mmpose==1.3.2
+uv run mim download mmpose --config video-pose-lift_tcn-243frm-supv-cpn-ft_8xb128-200e_h36m --dest checkpoints
+```
 
 ## Usage
 
-### Using uv
+### Basic Real-time Control
 
-Run the CLI to stream webcam → pose estimation → DOFBOT:
+Run the main CLI to stream webcam → pose estimation → DOFBOT:
 
 ```powershell
 uv run cv-pose-to-arm [--com COM_PORT] [--baud BAUD] [--fps FPS] \
@@ -98,23 +73,22 @@ uv run python -m cv_arm [--com COM_PORT] \
   [--baud BAUD] [--fps FPS] [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
 ```
 
-### Using pip
+### Test Scripts
 
-Run the CLI to stream webcam → pose estimation → DOFBOT:
-
-```powershell
-cv-pose-to-arm [--com COM_PORT] [--baud BAUD] [--fps FPS] \
-  [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
-```
-
-Alternatively, invoke the package directly:
+Test different pose estimation models:
 
 ```powershell
-python -m cv_arm [--com COM_PORT] \
-  [--baud BAUD] [--fps FPS] [--variant lite|full|heavy] [--display] [--verbose] [--quiet]
+# Test PoseFormer (transformer-based 3D)
+uv run python poseformer_test.py
+
+# Test VideoPose3D (experimental)
+uv run python videopose_3_d_dofbot.py
+
+# Performance benchmarking
+uv run python pose_fps_test.py --source 0 --duration 10
 ```
 
-Options:
+### Command Options
 - `--com`: e.g. `COM3` to enable serial output (omit to disable)
 - `--baud`: baud rate (default: 2000000)
 - `--fps`: command update rate (default: 60)
@@ -122,45 +96,99 @@ Options:
 - `--display`: overlay landmarks and diagnostics on video window
 - `--verbose` / `--quiet`: set logging level to DEBUG or ERROR
 
-Example with uv:
+### Example Usage
 
 ```powershell
+# Basic usage with display
 uv run cv-pose-to-arm --com COM3 --variant full --display --verbose
+
+# Experimental 3D pose estimation
+uv run python videopose_3_d_dofbot.py
+
+# Performance testing
+uv run python pose_fps_test.py --source 0 --duration 10 --display
 ```
 
-Example with pip:
+Press <Esc> in the video window to exit.
 
-```powershell
-cv-pose-to-arm --com COM3 --variant full --display --verbose
-```
+## Configuration
 
-Press <Esc> in the window to exit.
+Override default parameters by editing `cv_arm/config.yaml`. Missing keys fall back to built-in defaults.
 
-## Configuration File
+## Model Comparison
 
-You can override default parameters by editing `cv_arm/config.yaml`. Any keys missing will fall back to the built-in defaults.
+| Model | Z-axis Accuracy | Speed (FPS) | Memory | Use Case |
+|-------|----------------|-------------|---------|----------|
+| MediaPipe Lite | Good | 30+ | Low | Real-time, responsive |
+| MediaPipe Full | Good | 20+ | Medium | Balanced accuracy/speed |
+| PoseFormer | Very Good | 10-15 | High | Transformer-based 3D |
+| VideoPose3D | Fair | 5-10 | High | Research/experimental |
+
+**Recommendation**: Use **MediaPipe Full** for the best balance of accuracy and real-time performance.
 
 ## Performance Testing
 
-To measure pose estimation FPS, run:
+Measure pose estimation performance:
 
 ```powershell
-# With uv
-uv run python pose_fps_test.py --source 0 --duration 10
+uv run python pose_fps_test.py --source 0 --duration 10 --display
+```
 
-# With pip
-python pose_fps_test.py --source 0 --duration 10
-``` 
-
-More options:
-- `--source`: camera index or video file
+Options:
+- `--source`: camera index or video file path
 - `--duration`: test duration in seconds
-- `--display`: show annotated video
+- `--display`: show annotated video output
+
+## Project Structure
+
+```
+cv-arm/
+├── cv_arm/              # Main package
+│   ├── __main__.py      # CLI entry point
+│   ├── pose_to_arm.py   # Core pose-to-arm logic
+│   ├── config.yaml      # Configuration parameters
+│   └── ...
+├── tests/               # Unit tests
+├── checkpoints/         # Model weights and configs
+├── poseformer_test.py   # PoseFormer transformer script
+├── videopose_3_d_dofbot.py  # VideoPose3D script
+├── pose_fps_test.py     # Performance benchmarking
+└── pyproject.toml       # Project configuration
+```
 
 ## Testing & CI
 
-- Run `uv run pytest` (or `pytest` with pip) locally to execute unit tests in the `tests/` folder.
-- A GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs tests on each push and pull request.
+Run the test suite:
+
+```powershell
+uv run pytest
+```
+
+A GitHub Actions workflow automatically runs tests on each push and pull request.
+
+## Hardware Requirements
+
+- **CPU**: Modern multi-core processor (Intel i5+ or AMD Ryzen 5+)
+- **RAM**: 8GB minimum, 16GB recommended for VideoPose3D
+- **GPU**: Optional but recommended for VideoPose3D (NVIDIA GTX 1060+ or RTX series)
+- **Camera**: USB webcam or built-in camera
+- **Serial**: USB-to-serial adapter for DOFBOT communication
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Serial connection failed**: Check COM port and ensure DOFBOT is connected
+2. **Low FPS**: Try `lite` variant or reduce video resolution
+3. **Import errors**: Ensure all dependencies installed with `uv sync`
+4. **Model loading slow**: First run downloads models, subsequent runs are faster
+
+### Performance Optimization
+
+- Use GPU acceleration for VideoPose3D: Install CUDA-enabled PyTorch
+- Reduce video resolution for better FPS
+- Use `lite` model variant for real-time applications
+- Close other applications to free system resources
 
 ## License
 
