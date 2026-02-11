@@ -5,8 +5,8 @@ import serial
 import struct
 import time
 
-# Serial Configuration (matching your working CV code)
-COM_PORT = 'COM3'
+# Serial Configuration
+COM_PORT = 'COM5'  # Updated to COM5
 BAUD_RATE = 2_000_000
 PACK = struct.Struct(">H6B")
 
@@ -17,7 +17,6 @@ def test_arm():
         print(f"✓ Connected to {COM_PORT}")
     except Exception as e:
         print(f"❌ Serial error: {e}")
-        print("Check COM port and ensure DOFBOT is connected")
         return
 
     # Test positions: [j0, j1, j2, j3, j4, j5]

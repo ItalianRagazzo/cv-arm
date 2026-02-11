@@ -1,11 +1,8 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
 
 [project]
-name = "cv-arm"
-version = "0.1.0"
-description = "Webcam to MediaPipe Pose to DOFBOT angles"
+name = "simple-cv-arm"
+version = "0.2.0"
+description = "Simple webcam to DOFBOT arm control using MediaPipe"
 authors = [
     {name = "Nathan DiGilio"},
     {name = "Nick Yaple"},
@@ -14,33 +11,24 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 dependencies = [
-    "opencv-python",
-    "mediapipe==0.10.13",
-    "pyserial",
-    "numpy",
-    "openmim",
-    "setuptools",
-    "platformdirs",
-    "typer",
-    "pyyaml",
-    "torch>=2.0.0",
-    "smbus2>=0.5.0",
+    "opencv-python>=4.5.0",
+    "mediapipe>=0.10.0",
+    "pyserial>=3.5",
+    "numpy>=1.20.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
 ]
-torch = [
-    "torch>=2.0.0",
-    "torchvision",
-    "torchaudio",
-]
-
-
 
 [project.scripts]
-cv-pose-to-arm = "cv_arm.pose_to_arm:app"
+cv-arm = "cv_arm:main"
+arm-test = "arm_test:test_arm"
 
-[tool.hatch.build.targets.wheel]
-packages = ["cv_arm"]
+[tool.setuptools]
+py-modules = ["cv_arm", "arm_test"]
+
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
